@@ -23,7 +23,8 @@ h1{font-size:clamp(30px,5vw,48px);line-height:1.05;margin:0;font-weight:800;text
 .tally b{font-size:clamp(34px,6vw,52px);line-height:1;color:var(--visit);font-weight:800}
 .tally span{color:var(--muted)}
 .mapcard{position:relative;background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 1px 2px #0001,0 8px 28px #0000000d}
-#map{display:block;width:100%;height:auto;aspect-ratio:900/440;cursor:grab;touch-action:none;user-select:none}
+#map{display:block;width:100%;height:auto;aspect-ratio:900/440;cursor:grab;touch-action:pan-y;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+#map.zoomed{touch-action:none}
 #map.drag{cursor:grabbing}
 #map .f path{fill:#fff;stroke:none;transition:fill .35s}
 #map .f path.ok{cursor:pointer}
@@ -65,7 +66,8 @@ dialog::backdrop{background:#0006}
 dialog p{margin:0 0 18px}
 .dl{display:flex;gap:10px;justify-content:flex-end}
 .danger{background:#c62828;color:#fff;border-color:#c62828}
-@media(max-width:600px){section{scroll-margin-top:170px}.zoom button{width:40px;height:40px}}
+.clearrow{display:flex;justify-content:flex-end;margin-top:10px}
+@media(max-width:600px){header{margin-bottom:12px}.tally b{font-size:40px}.zoom{position:static;flex-direction:row;justify-content:flex-end;padding:0 8px 8px;gap:8px}.zoom button{width:44px;height:40px;font-size:20px}.conts{grid-template-columns:1fr 1fr;gap:10px 16px;margin-top:20px}.tools{padding:10px 0 6px}.row1{flex-wrap:nowrap;gap:8px}#q{flex:1 1 auto;padding:10px 12px}.btn{padding:0 12px;white-space:nowrap}.letters{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:6px -4px 0;padding:0 4px}.letters::-webkit-scrollbar{display:none}.letters button{flex:none;min-width:34px;height:36px}section{scroll-margin-top:118px}section h2{font-size:24px}.grid{grid-template-columns:1fr}label.c{padding:4px 6px}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -82,16 +84,16 @@ dialog p{margin:0 0 18px}
     <div id="tip"></div>
     <div class="zoom"><button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">−</button><button id="zreset" aria-label="Reset view" style="font-size:16px">⟲</button></div>
   </div>
-  <p class="note">Tick a country below or tap it on the map. Drag to pan, use + / − to zoom. Very small countries appear as dots. <span class="status" id="status"></span></p>
+  <p class="note">Tick a country below or tap it on the map. Drag to pan; zoom with + / − or pinch. Very small countries appear as dots. <span class="status" id="status"></span></p>
 
   <div class="conts" id="conts"></div>
+  <div class="clearrow"><button class="btn" id="clear">Clear all</button></div>
 
   <div class="tools">
     <div class="row1">
       <input id="q" type="search" placeholder="Search countries…" aria-label="Search countries" autocomplete="off">
       <button class="btn" id="onlyv" aria-pressed="false">Visited only</button>
-      <button class="btn" id="clear">Clear all</button>
-    </div>
+          </div>
     <div class="letters" id="letters"></div>
   </div>
 
@@ -171,7 +173,7 @@ function toggle(c,force){
 
 /* ---------- map ---------- */
 let VB={x:0,y:0,w:900,h:440},BASE={...VB};
-function setVB(){svg.setAttribute('viewBox',`${VB.x} ${VB.y} ${VB.w} ${VB.h}`)}
+function setVB(){svg.setAttribute('viewBox',`${VB.x} ${VB.y} ${VB.w} ${VB.h}`);svg.classList.toggle('zoomed',VB.w<BASE.w-0.5)}
 function project(m,lat,lng){
   try{
     const cm=(m.projection&&m.projection.centralMeridian)||0,R=6381372,d=Math.PI/180;
@@ -215,20 +217,44 @@ function clamp(){VB.x=Math.min(Math.max(VB.x,BASE.x),BASE.x+BASE.w-VB.w);VB.y=Ma
 function svgPt(e){const r=svg.getBoundingClientRect();return{x:VB.x+(e.clientX-r.left)/r.width*VB.w,y:VB.y+(e.clientY-r.top)/r.height*VB.h}}
 $('zin').onclick=()=>zoomBy(1.6);$('zout').onclick=()=>zoomBy(1/1.6);$('zreset').onclick=()=>{VB={...BASE};setVB()};
 svg.addEventListener('wheel',e=>{if(!e.ctrlKey&&!e.metaKey&&VB.w===BASE.w&&e.deltaY>0)return;e.preventDefault();const p=svgPt(e);zoomBy(e.deltaY<0?1.25:0.8,p.x,p.y)},{passive:false});
-let drag=null;
-svg.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,vx:VB.x,vy:VB.y,moved:false,t:e.target};svg.setPointerCapture(e.pointerId)});
-svg.addEventListener('pointermove',e=>{
-  if(drag){const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>5){drag.moved=true;svg.classList.add('drag')}
-    if(drag.moved){const r=svg.getBoundingClientRect();VB.x=drag.vx-dx/r.width*VB.w;VB.y=drag.vy-dy/r.height*VB.h;clamp();setVB()}}
-  const t=document.elementFromPoint(e.clientX,e.clientY);
+/* one finger/mouse: tap to tick, drag to pan; two fingers: pinch to zoom */
+let drag=null,pinch=null;const pts=new Map();
+function showTip(e,t){
   const nm=t&&t.dataset&&t.dataset.name;
-  if(nm&&!(drag&&drag.moved)){const r=card.getBoundingClientRect();tip.textContent=nm+(t.dataset.c&&visited.has(t.dataset.c)?' ✓':'');tip.style.left=(e.clientX-r.left)+'px';tip.style.top=(e.clientY-r.top)+'px';tip.style.opacity=1}else tip.style.opacity=0;
+  if(!nm){tip.style.opacity=0;return}
+  const r=card.getBoundingClientRect();tip.textContent=nm+(t.dataset.c&&visited.has(t.dataset.c)?' ✓':'');
+  tip.style.left=Math.min(Math.max(e.clientX-r.left,60),r.width-60)+'px';tip.style.top=(e.clientY-r.top)+'px';tip.style.opacity=1;
+}
+function startPinch(){const[a,b]=[...pts.values()];const r=svg.getBoundingClientRect();const mid={clientX:(a.x+b.x)/2,clientY:(a.y+b.y)/2};pinch={d:Math.hypot(a.x-b.x,a.y-b.y)||1,vb:{...VB},c:svgPt(mid),r};drag=null;tip.style.opacity=0}
+svg.addEventListener('pointerdown',e=>{
+  pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  try{svg.setPointerCapture(e.pointerId)}catch(_){}
+  if(pts.size===2){startPinch();return}
+  if(pts.size===1)drag={x:e.clientX,y:e.clientY,vx:VB.x,vy:VB.y,moved:false,t:e.target};
 });
-svg.addEventListener('pointerup',e=>{
-  if(drag&&!drag.moved){const t=drag.t;if(t&&t.dataset&&t.dataset.c)toggle(t.dataset.c)}
+svg.addEventListener('pointermove',e=>{
+  if(pts.has(e.pointerId))pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(pinch&&pts.size===2){
+    const[a,b]=[...pts.values()];const s=Math.hypot(a.x-b.x,a.y-b.y)/pinch.d;
+    const nw=Math.min(BASE.w,Math.max(BASE.w/12,pinch.vb.w/s)),k=nw/pinch.vb.w;
+    const mx=((a.x+b.x)/2-pinch.r.left)/pinch.r.width,my=((a.y+b.y)/2-pinch.r.top)/pinch.r.height;
+    const nh=pinch.vb.h*k;/* keep the map point first pinched under the fingers' midpoint */
+    VB={x:pinch.c.x-mx*nw,y:pinch.c.y-my*nh,w:nw,h:nh};
+    clamp();setVB();return;
+  }
+  if(drag){const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>(e.pointerType==='touch'?10:5)){drag.moved=true;svg.classList.add('drag')}
+    if(drag.moved){const r=svg.getBoundingClientRect();VB.x=drag.vx-dx/r.width*VB.w;VB.y=drag.vy-dy/r.height*VB.h;clamp();setVB()}}
+  if(e.pointerType==='mouse')showTip(e,document.elementFromPoint(e.clientX,e.clientY));
+});
+function endPtr(e,cancel){
+  pts.delete(e.pointerId);
+  if(pinch){if(pts.size<2)pinch=null;drag=null;svg.classList.remove('drag');return}
+  if(!cancel&&drag&&!drag.moved){const t=drag.t;if(t&&t.dataset&&t.dataset.c){toggle(t.dataset.c);if(e.pointerType!=='mouse'){showTip(e,t);clearTimeout(endPtr.h);endPtr.h=setTimeout(()=>tip.style.opacity=0,1400)}}}
   drag=null;svg.classList.remove('drag');
-});
-svg.addEventListener('pointerleave',()=>{tip.style.opacity=0});
+}
+svg.addEventListener('pointerup',e=>endPtr(e,false));
+svg.addEventListener('pointercancel',e=>endPtr(e,true));
+svg.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse')tip.style.opacity=0});
 
 /* ---------- list events ---------- */
 buildList();render();
