@@ -25,12 +25,12 @@ h1{font-size:clamp(30px,5vw,48px);line-height:1.05;margin:0;font-weight:800;text
 .mapcard{position:relative;background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 1px 2px #0001,0 8px 28px #0000000d}
 #map{display:block;width:100%;height:auto;aspect-ratio:900/440;cursor:grab;touch-action:none;user-select:none}
 #map.drag{cursor:grabbing}
-#map path{fill:#fff;stroke:#111;stroke-width:.6;vector-effect:non-scaling-stroke;transition:fill .35s}
-#map path.ok{cursor:pointer}
-#map path.ok:hover{fill:#eaf0fc}
-#map path.on,#map path.on:hover{fill:var(--visit)}
+#map .f path{fill:#fff;stroke:none;transition:fill .35s}
+#map .f path.ok{cursor:pointer}
+#map .f path.ok:not(.on):hover{fill:#eaf0fc}
+#map .lines{pointer-events:none}
+#map .lines path{fill:none;stroke:#111;stroke-width:.8;stroke-linejoin:round;vector-effect:non-scaling-stroke}
 #map circle{fill:#fff;stroke:#111;stroke-width:.8;vector-effect:non-scaling-stroke;cursor:pointer}
-#map circle.on{fill:var(--visit);stroke:var(--visit-2)}
 .zoom{position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;gap:6px}
 .zoom button{width:44px;height:44px;border-radius:10px;border:1px solid #cfd3da;background:#fff;color:#121212;font:600 22px/1 Outfit,sans-serif;cursor:pointer}
 .zoom button:hover{background:#f1f3f6}
@@ -115,6 +115,9 @@ const BY=Object.fromEntries(C.map(x=>[x.c,x]));
 const ALIAS={_0:'CY',_1:'XK',_2:'SO',KO:'XK'};
 /* approximate positions for countries too small to have a shape */
 const DOTS={AD:[42.5,1.5],MC:[43.73,7.42],SM:[43.94,12.45],VA:[41.9,12.45],LI:[47.14,9.55],MT:[35.9,14.4],SG:[1.35,103.82],BH:[26.03,50.55],MV:[3.2,73.22],SC:[-4.68,55.49],MU:[-20.2,57.5],KM:[-11.7,43.3],ST:[0.3,6.6],CV:[15.1,-23.6],TO:[-21.2,-175.2],WS:[-13.8,-172.1],KI:[1.45,173.0],MH:[7.1,171.2],FM:[6.9,158.2],NR:[-0.53,166.93],TV:[-8.52,179.2],PW:[7.5,134.6],AG:[17.1,-61.8],DM:[15.4,-61.37],LC:[13.9,-60.98],VC:[13.25,-61.2],GD:[12.1,-61.68],KN:[17.3,-62.73],BB:[13.15,-59.55],TT:[10.6,-61.3],BN:[4.6,114.7],LU:[49.8,6.12],QA:[25.3,51.2],TW:[23.7,121],PS:[31.9,35.2],XK:[42.6,20.9],CY:[35.1,33.4],JM:[18.1,-77.3],KW:[29.3,47.6],SB:[-9.6,160.1],VU:[-15.4,166.9],FJ:[-17.7,178.1],BS:[24.3,-76.6],TL:[-8.8,125.7],GM:[13.45,-15.4],LB:[33.9,35.86],ME:[42.7,19.3],SI:[46.1,14.9],BT:[27.5,90.4]};
+/* main flag colour per country; where a flag is mostly white, its main other colour */
+const FLAG=Object.fromEntries(`AF:#BE0000;AL:#E41E20;DZ:#006233;AD:#10069F;AO:#CC092F;AG:#CE1126;AR:#74ACDF;AM:#D90012;AU:#012169;AT:#C8102E;AZ:#00B5E2;BS:#00778B;BH:#CE1126;BD:#006A4E;BB:#00267F;BY:#C8313E;BE:#FDDA24;BZ:#171696;BJ:#008751;BT:#FF4E12;BO:#007934;BA:#002395;BW:#75AADB;BR:#009C3B;BN:#F7E017;BG:#00966E;BF:#EF2B2D;BI:#CE1126;CV:#003893;KH:#032EA1;CM:#007A5E;CA:#D52B1E;CF:#003082;TD:#002664;CL:#D52B1E;CN:#EE1C25;CO:#FCD116;KM:#3D8E33;CG:#009543;CR:#002B7F;CI:#F77F00;HR:#E30A17;CU:#002A8F;CY:#D57800;CZ:#D7141A;CD:#007FFF;DK:#C8102E;DJ:#6AB2E7;DM:#006B3F;DO:#002D62;EC:#FFDD00;EG:#CE1126;SV:#0F47AF;GQ:#3E9A00;ER:#EA0437;EE:#0072CE;SZ:#3E5EB9;ET:#078930;FJ:#68BFE5;FI:#002F6C;FR:#002654;GA:#009E60;GM:#CE1126;GE:#E8112D;DE:#DD0000;GH:#CE1126;GR:#0D5EAF;GD:#CE1126;GT:#4997D0;GN:#CE1126;GW:#CE1126;GY:#009E49;HT:#00209F;HN:#0073CF;HU:#CE2939;IS:#02529C;IN:#FF9933;ID:#CE1126;IR:#239F40;IQ:#CE1126;IE:#169B62;IL:#0038B8;IT:#009246;JM:#009B3A;JP:#BC002D;JO:#007A3D;KZ:#00AFCA;KE:#BB0000;KI:#CE1126;XK:#244AA5;KW:#007A3D;KG:#E8112D;LA:#002868;LV:#9E3039;LB:#ED1C24;LS:#00209F;LR:#BF0A30;LY:#239E46;LI:#002B7F;LT:#FDB913;LU:#00A1DE;MG:#FC3D32;MW:#CE1126;MY:#CC0001;MV:#D21034;ML:#14B53A;MT:#CF142B;MH:#003893;MR:#006233;MU:#EA2839;MX:#006847;FM:#75B2DD;MD:#0046AE;MC:#CE1126;MN:#C4272F;ME:#C40308;MA:#C1272D;MZ:#007168;MM:#FECB00;NA:#003580;NR:#002B7F;NP:#DC143C;NL:#AE1C28;NZ:#00247D;NI:#0067C6;NE:#E05206;NG:#008751;KP:#ED1C27;MK:#CE2028;NO:#BA0C2F;OM:#DB161B;PK:#01411C;PW:#4AADD6;PS:#007A3D;PA:#DA121A;PG:#CE1126;PY:#D52B1E;PE:#D91023;PH:#0038A8;PL:#DC143C;PT:#DA291C;QA:#8A1538;RO:#FCD116;RU:#0039A6;RW:#00A1DE;KN:#009E49;LC:#65CFFF;VC:#009E60;WS:#CE1126;SM:#5EB6E4;ST:#12AD2B;SA:#006C35;SN:#00853F;RS:#C6363C;SC:#D62828;SL:#1EB53A;SG:#EF3340;SK:#0B4EA2;SI:#005DA4;SB:#0051BA;SO:#4189DD;ZA:#007A4D;KR:#CD2E3A;SS:#078930;ES:#AA151B;LK:#8D153A;SD:#D21034;SR:#B40A2D;SE:#006AA7;CH:#DA291C;SY:#007A3D;TW:#FE0000;TJ:#CC0000;TZ:#1EB53A;TH:#241D4F;TL:#DC241F;TG:#006A4E;TO:#C10000;TT:#CE1126;TN:#E70013;TR:#E30A17;TM:#00843D;TV:#009FCA;UG:#FCDC04;UA:#0057B7;AE:#00732F;GB:#012169;US:#3C3B6E;UY:#0038A8;UZ:#0099B5;VU:#009543;VA:#FFE000;VE:#FFCC00;VN:#DA251D;YE:#CE1126;ZM:#198A00;ZW:#006400`.split(';').map(s=>s.split(':')));
+const col=c=>FLAG[c]||'#1f5fd6';
 const KEY='travel-map-v1';
 let visited=new Set();
 try{const s=JSON.parse(localStorage.getItem(KEY)||'[]');if(Array.isArray(s))s.forEach(c=>BY[c]&&visited.add(c))}catch(e){}
@@ -128,7 +131,7 @@ function buildList(){
   const groups={};
   for(const x of C){const L=x.n.normalize('NFD')[0].toUpperCase();(groups[L]=groups[L]||[]).push(x)}
   const letters=Object.keys(groups).sort();
-  $('list').innerHTML=letters.map(L=>`<section id="sec-${L}" data-l="${L}"><h2>${L}<small></small></h2><div class="grid">${groups[L].map(x=>`<label class="c" data-c="${x.c}" data-n="${x.n.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase()}"><input type="checkbox" value="${x.c}"><span>${x.n}</span><small>${CONT[x.k]}</small></label>`).join('')}</div></section>`).join('')+'<p class="empty" id="empty" hidden>No countries match.</p>';
+  $('list').innerHTML=letters.map(L=>`<section id="sec-${L}" data-l="${L}"><h2>${L}<small></small></h2><div class="grid">${groups[L].map(x=>`<label class="c" data-c="${x.c}" data-n="${x.n.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase()}"><input type="checkbox" value="${x.c}" style="accent-color:${col(x.c)}"><span>${x.n}</span><small>${CONT[x.k]}</small></label>`).join('')}</div></section>`).join('')+'<p class="empty" id="empty" hidden>No countries match.</p>';
   $('letters').innerHTML='ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(L=>`<button data-l="${L}" ${groups[L]?'':'disabled'}>${L}</button>`).join('');
 }
 function filter(){
@@ -149,7 +152,7 @@ function filter(){
 /* ---------- render state ---------- */
 function render(){
   for(const l of document.querySelectorAll('label.c')){const on=visited.has(l.dataset.c);l.classList.toggle('on',on);l.firstChild.checked=on}
-  for(const p of svg.querySelectorAll('[data-c]'))p.classList.toggle('on',visited.has(p.dataset.c));
+  for(const p of svg.querySelectorAll('[data-c]')){const on=visited.has(p.dataset.c);p.classList.toggle('on',on);p.style.fill=on?col(p.dataset.c):''}
   for(const s of document.querySelectorAll('#list section')){const all=s.querySelectorAll('label.c'),n=[...all].filter(l=>visited.has(l.dataset.c)).length;s.querySelector('h2 small').textContent=n?`${n} of ${all.length} visited`:''}
   const n=visited.size,pct=Math.round(n/C.length*100);
   $('count').textContent=n;$('countof').textContent=`of ${C.length} countries · ${pct}%`;
@@ -180,13 +183,17 @@ function drawMap(m){
   if(!m||!m.paths)return;
   const W=m.width||900,H=m.height||440;
   VB={x:0,y:0,w:W,h:H};BASE={...VB};setVB();svg.style.aspectRatio=`${W}/${H}`;
-  const have=new Set();let html='';
+  const have=new Set();let fills='',lines='';
   for(const[k,v] of Object.entries(m.paths)){
     const code=ALIAS[k]||String(k).toUpperCase();
     const known=!!BY[code];if(known)have.add(code);
     const nm=known?BY[code].n:(v.name||'');
-    html+=`<path d="${String(v.path).replace(/[^MLHVCSQTAZmlhvcsqtaz0-9.,\s-]/g,'')}" ${known?`class="ok" data-c="${code}"`:''} data-name="${nm.replace(/[&<>"']/g,'')}"></path>`;
+    const d=String(v.path).replace(/[^MLHVCSQTAZmlhvcsqtaz0-9.,\s-]/g,'');
+    fills+=`<path d="${d}" ${known?`class="ok" data-c="${code}"`:''} data-name="${nm.replace(/[&<>"']/g,'')}"></path>`;
+    lines+=`<path d="${d}"></path>`;
   }
+  /* borders are one layer; the filter makes a shared border (drawn twice) as dark as a coastline (drawn once) */
+  let html=`<defs><filter id="even" x="-2%" y="-2%" width="104%" height="104%"><feComponentTransfer><feFuncA type="linear" slope="3" intercept="0"/></feComponentTransfer></filter></defs><g class="f">${fills}</g><g class="lines" filter="url(#even)">${lines}</g>`;
   for(const[c,[lat,lng]] of Object.entries(DOTS)){
     if(have.has(c)||!BY[c])continue;
     const p=project(m,lat,lng);if(!p)continue;
